@@ -1,5 +1,7 @@
 #----------------------------------------------------------------------------#
 # Imports
+
+# I should do the count for upcoming shows in the venes page
 #----------------------------------------------------------------------------#
 
 import json
@@ -35,7 +37,7 @@ migrate = Migrate(app, db)
 
 class Cities(db.Model):
     __tablename__ = 'City'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True) #may be possible to use enum here
     city = db.Column(db.String(120))
     state = db.Column(db.String(120))
     venue = db.relationship('Venue', backref='city', lazy=True)
@@ -45,14 +47,17 @@ class Venue(db.Model):
     __tablename__ = 'Venue'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
+    name = db.Column(db.String, unique=True)
     address = db.Column(db.String(120))
     phone = db.Column(db.String(120))
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
     # Do this later, num_shows should be aggregated based on number of upcoming shows per venue.
     # num_upcoming_shows = (db.Integer, primary_key=True)
+    seeking_talent = db.Column(db.Boolean, nullable=False)
+    seeking_description = db.Column(db.String)
     city_id = db.Column(db.Integer, db.ForeignKey('City.id'), nullable=False)
+    genere = db.Column(db.String)
 
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
@@ -61,7 +66,7 @@ class Artist(db.Model):
     __tablename__ = 'Artist'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
+    name = db.Column(db.String, unique=True)
     phone = db.Column(db.String(120))
     genres = db.Column(db.String(120))
     image_link = db.Column(db.String(500))
@@ -78,6 +83,7 @@ class Shows(db.Model):
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
 # TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
+
 
 #----------------------------------------------------------------------------#
 # Filters.
@@ -109,7 +115,20 @@ def index():
 def venues():
   # TODO: replace with real venues data.
   #       num_shows should be aggregated based on number of upcoming shows per venue.
-  data=[{
+  data = []
+  venues = {}
+  cities = Cities.query.all()
+  for city in cities:
+    venues[city.id] = Venue.query.filter_by(city_id = city.id).all()
+  # for city in cities:
+  #   print(city.city)
+  #   data2['city'] = city.city
+  #   data2['state'] = city.state
+  #   data2['venues'] = Venue.query.filter_by(city_id = city.id).all()
+  #   print(data)
+  #   data.append(data2)
+  # data.venues = Venues.query.all()
+  data3=[{
     "city": "San Francisco",
     "state": "CA",
     "venues": [{
@@ -130,27 +149,36 @@ def venues():
       "num_upcoming_shows": 0,
     }]
   }]
-  return render_template('pages/venues.html', areas=data);
+  return render_template('pages/venues.html', areas=cities, venues=venues);
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
   # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
   # seach for Hop should return "The Musical Hop".
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
-  response={
-    "count": 1,
-    "data": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 0,
-    }]
-  }
+  search_word = request.form.get('search_term', '')
+  # Sources:https://stackoverflow.com/questions/20363836/postgresql-ilike-query-with-sqlalchemy
+  # https://stackoverflow.com/questions/16573095/case-insensitive-flask-sqlalchemy-query
+  response = Venue.query.filter(Venue.name.ilike(f'%{search_word}%')).all()
+  # response = Venue.query.filter_by(name = search_word).all()
+  print (search_word, response)
+  # response={
+  #   "count": 1,
+  #   "data": [{
+  #     "id": 2,
+  #     "name": "The Dueling Pianos Bar",
+  #     "num_upcoming_shows": 0,
+  #   }]
+  # }
   return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
 
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):
   # shows the venue page with the given venue_id
   # TODO: replace with real venue data from the venues table, using venue_id
+  response = Venue.query.get(venue_id)
+  response.genres = response.genere[1:-1].split(',')
+  print(response.genere)
   data1={
     "id": 1,
     "name": "The Musical Hop",
@@ -228,19 +256,54 @@ def show_venue(venue_id):
     "past_shows_count": 1,
     "upcoming_shows_count": 1,
   }
-  data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
-  return render_template('pages/show_venue.html', venue=data)
+  # data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
+  return render_template('pages/show_venue.html', venue=response)
 
 #  Create Venue
 #  ----------------------------------------------------------------
 
 @app.route('/venues/create', methods=['GET'])
 def create_venue_form():
+  # https://stackoverflow.com/questions/20831871/how-to-avoid-inserting-duplicate-entries-when-adding-values-via-a-sqlalchemy-rel
   form = VenueForm()
+
+  # state options
+  # source:https://stackoverflow.com/questions/37133774/how-can-i-select-only-one-column-using-sqlalchemy
+  states = db.session.query(Cities.id, Cities.state).all()
+  # source:https://stackoverflow.com/questions/59603650/passing-a-variable-into-a-wtforms-class
+  form.state.choices=states
   return render_template('forms/new_venue.html', form=form)
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
+  # source:https://wtforms.readthedocs.io/en/2.3.x/crash_course/
+  form = VenueForm(request.form)
+
+  # source:https://stackoverflow.com/questions/32938475/flask-sqlalchemy-check-if-row-exists-in-table
+  city_name = db.session.query(Cities.city).filter_by(id=form.state.data).scalar() # is not None
+  if (city_name == form.city.data):
+    print("exist")
+    city_id = form.state.data
+  else:
+    print("No")
+    state = db.session.query(Cities.state).filter_by(id=form.state.data).scalar()
+    city = Cities(city=form.city.data, state=state)
+    # source:https://stackoverflow.com/questions/1316952/sqlalchemy-flush-and-get-inserted-id
+    db.session.add(city)
+    db.session.flush()
+    db.session.refresh(city)
+    city_id = city.id
+
+  # print(city_id)
+  gen = form.genres.data[:-1]
+  print(gen)
+  print("Stuuuupid: ", form.genres.data[:-1])
+  venue = Venue(name=form.name.data, address=form.address.data, phone=form.phone.data, facebook_link=form.facebook_link.data, city_id=city_id, seeking_talent=False, genere=gen)
+  # todo = Todo(description=description)
+  db.session.add(venue)
+  db.session.commit()
+
+
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
 
@@ -400,7 +463,10 @@ def edit_artist_submission(artist_id):
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
-  form = VenueForm()
+  form = VenueForm(choices=[
+            ('AL', 'AL'),
+            ('AK', 'AK'),
+            ('AZ', 'AZ')])
   venue={
     "id": 1,
     "name": "The Musical Hop",
