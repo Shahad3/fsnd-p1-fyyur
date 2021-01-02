@@ -21,6 +21,8 @@ logger = logging.getLogger('alembic.env')
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
+from app import Cities, Venue, Artist, Shows
+# https://stackoverflow.com/questions/51783300/flask-migrate-no-changes-detected-to-schema-on-first-migration
 from flask import current_app
 config.set_main_option(
     'sqlalchemy.url',
