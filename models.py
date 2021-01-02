@@ -1,5 +1,20 @@
-from app import db
+# ------Added-------#
+from flask_migrate import Migrate
+from flask import Flask, render_template, request, Response, flash, redirect, url_for
+from flask_moment import Moment
+from flask_sqlalchemy import SQLAlchemy
+#----------------------------------------------------------------------------#
+# App Config.
+#----------------------------------------------------------------------------#
 
+app = Flask(__name__)
+moment = Moment(app)
+app.config.from_object('config')
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:xyz@localhost:5432/fyyur'
+db = SQLAlchemy(app)
+
+# TODO: connect to a local postgresql database
+migrate = Migrate(app, db)
 
 #----------------------------------------------------------------------------#
 # Models.
