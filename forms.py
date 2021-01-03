@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask_wtf import Form
-from wtforms import StringField, SelectField, SelectMultipleField, DateTimeField
+from wtforms import StringField, SelectField, SelectMultipleField, DateTimeField, RadioField
 from wtforms.validators import DataRequired, AnyOf, URL
 
 class ShowForm(Form):
@@ -28,7 +28,57 @@ class VenueForm(Form):
     )
     state = SelectField(
         'state', validators=[DataRequired()],
-        choices = [('AL', 'AL')]
+        choices = [ ('AL', 'AL'),
+            ('AK', 'AK'),
+            ('AZ', 'AZ'),
+            ('AR', 'AR'),
+            ('CA', 'CA'),
+            ('CO', 'CO'),
+            ('CT', 'CT'),
+            ('DE', 'DE'),
+            ('DC', 'DC'),
+            ('FL', 'FL'),
+            ('GA', 'GA'),
+            ('HI', 'HI'),
+            ('ID', 'ID'),
+            ('IL', 'IL'),
+            ('IN', 'IN'),
+            ('IA', 'IA'),
+            ('KS', 'KS'),
+            ('KY', 'KY'),
+            ('LA', 'LA'),
+            ('ME', 'ME'),
+            ('MT', 'MT'),
+            ('NE', 'NE'),
+            ('NV', 'NV'),
+            ('NH', 'NH'),
+            ('NJ', 'NJ'),
+            ('NM', 'NM'),
+            ('NY', 'NY'),
+            ('NC', 'NC'),
+            ('ND', 'ND'),
+            ('OH', 'OH'),
+            ('OK', 'OK'),
+            ('OR', 'OR'),
+            ('MD', 'MD'),
+            ('MA', 'MA'),
+            ('MI', 'MI'),
+            ('MN', 'MN'),
+            ('MS', 'MS'),
+            ('MO', 'MO'),
+            ('PA', 'PA'),
+            ('RI', 'RI'),
+            ('SC', 'SC'),
+            ('SD', 'SD'),
+            ('TN', 'TN'),
+            ('TX', 'TX'),
+            ('UT', 'UT'),
+            ('VT', 'VT'),
+            ('VA', 'VA'),
+            ('WA', 'WA'),
+            ('WV', 'WV'),
+            ('WI', 'WI'),
+            ('WY', 'WY'),]
 
     )
     address = StringField(
@@ -38,7 +88,7 @@ class VenueForm(Form):
         'phone'
     )
     image_link = StringField(
-        'image_link'
+        'image_link' , validators=[URL()]
     )
     genres = SelectMultipleField(
         # TODO implement enum restriction
@@ -67,6 +117,14 @@ class VenueForm(Form):
     )
     facebook_link = StringField(
         'facebook_link', validators=[URL()]
+    )
+    website = StringField(
+        'facebook_link', validators=[URL()]
+    )
+    seeking_talent = RadioField(
+        'seeking_talent', validators=[DataRequired()], choices=[('True','Yes'),('False','No')])
+    seeking_description = StringField(
+        'seeking_description'
     )
 
 class ArtistForm(Form):
@@ -137,7 +195,7 @@ class ArtistForm(Form):
         'phone'
     )
     image_link = StringField(
-        'image_link'
+        'image_link', validators=[DataRequired()]
     )
     genres = SelectMultipleField(
         # TODO implement enum restriction
@@ -167,6 +225,14 @@ class ArtistForm(Form):
     facebook_link = StringField(
         # TODO implement enum restriction
         'facebook_link', validators=[URL()]
+    )
+    website = StringField(
+        'facebook_link', validators=[URL()]
+    )
+    seeking_venue = RadioField(
+        'seeking_venue', validators=[DataRequired()], choices=[('True','Yes'),('False','No')])
+    seeking_description = StringField(
+        'seeking_description'
     )
 
 # TODO IMPLEMENT NEW ARTIST FORM AND NEW SHOW FORM

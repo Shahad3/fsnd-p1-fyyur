@@ -30,6 +30,8 @@ from flask_migrate import Migrate
 app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
+# TODO: connect to a local postgresql database
+migrate = Migrate(app, db)
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:xyz@localhost:5432/fyyur'
 db = SQLAlchemy(app)
 
@@ -112,6 +114,15 @@ migrate = Migrate(app, db)
 # Controllers.
 #----------------------------------------------------------------------------#
 
+# source: https://stackoverflow.com/questions/21732123/convert-true-false-value-read-from-file-to-boolean
+def str_to_bool(s):
+    if s == 'True':
+         return True
+    elif s == 'False':
+         return False
+    else:
+         raise ValueError
+
 @app.route('/')
 def index():
   return render_template('pages/home.html')
@@ -163,7 +174,7 @@ def show_venue(venue_id):
   # shows the venue page with the given venue_id
   # TODO: replace with real venue data from the venues table, using venue_id
   response = Venue.query.get(venue_id)
-  response.genres = response.genere[1:-1].split(',')
+  response.genres = ''.join(response.genere[1:-1]).split(',')
   # source:https://www.programiz.com/python-programming/datetime/current-datetime
   today = date.today()
   response.past_shows = []
@@ -187,9 +198,9 @@ def create_venue_form():
 
   # state options
   # source:https://stackoverflow.com/questions/37133774/how-can-i-select-only-one-column-using-sqlalchemy
-  states = db.session.query(Cities.id, Cities.state).all()
+  # states = db.session.query(Cities.id, Cities.state).all()
   # source:https://stackoverflow.com/questions/59603650/passing-a-variable-into-a-wtforms-class
-  form.state.choices=states
+  # form.state.choices=states
   return render_template('forms/new_venue.html', form=form)
 
 @app.route('/venues/create', methods=['POST'])
@@ -198,14 +209,14 @@ def create_venue_submission():
   form = VenueForm(request.form)
 
   # source:https://stackoverflow.com/questions/32938475/flask-sqlalchemy-check-if-row-exists-in-table
-  city_name = db.session.query(Cities.city).filter_by(id=form.state.data).scalar() # is not None
-  if (city_name == form.city.data):
-    print("exist")
-    city_id = form.state.data
-  else:
-    print("No")
-    state = db.session.query(Cities.state).filter_by(id=form.state.data).scalar()
-    city = Cities(city=form.city.data, state=state)
+  city_id = db.session.query(Cities.id).filter_by(state=form.state.data, city=form.city.data).scalar() # is not None
+  if (city_id == None):
+    # print("exist")
+    # city_id = form.state.data
+  # else:
+    # print("No")
+    # state = db.session.query(Cities.state).filter_by(id=form.state.data).scalar()
+    city = Cities(city=form.city.data, state=form.state.data)
     # source:https://stackoverflow.com/questions/1316952/sqlalchemy-flush-and-get-inserted-id
     db.session.add(city)
     db.session.flush()
@@ -214,14 +225,15 @@ def create_venue_submission():
 
   # print(city_id)
   gen = form.genres.data[:-1]
-  venue = Venue(name=form.name.data, address=form.address.data, phone=form.phone.data, facebook_link=form.facebook_link.data, city_id=city_id, seeking_talent=False, genere=gen)
+  venue = Venue(name=form.name.data, address=form.address.data, phone=form.phone.data, facebook_link=form.facebook_link.data, city_id=city_id, seeking_talent=str_to_bool(form.seeking_talent.data), genere=gen, website=form.website.data, image_link=form.image_link.data, seeking_description=form.seeking_description.data)
   # todo = Todo(description=description)
   try:
     db.session.add(venue)
     db.session.commit()
     flash('Venue ' + request.form['name'] + ' was successfully listed!')
-  except:
+  except Exception as e:
     flash('An error occurred. Venue ' + form.name.data + ' could not be listed.')
+    print(e)
 
   return render_template('pages/home.html')
 
@@ -270,7 +282,7 @@ def show_artist(artist_id):
   today = date.today()
   data.past_shows = []
   data.upcoming_shows = []
-  data.genres = data.genres[1:-1].split(',')
+  data.genres = ''.join(data.genres[1:-1]).split(',')
   for show in data.shows:
     if(show.start_time > today):
       data.upcoming_shows.append(show)
@@ -287,7 +299,7 @@ def edit_artist(artist_id):
 
   # TODO: populate form with fields from artist with ID <artist_id>
   response = Artist.query.get(artist_id)
-  response.genres = response.genres[1:-1].split(',')
+  response.genres = ''.join(response.genres[1:-1]).split(',')
   # state options
   # source:https://stackoverflow.com/questions/37133774/how-can-i-select-only-one-column-using-sqlalchemy
   states = db.session.query(Cities.id, Cities.state).all()
@@ -297,6 +309,11 @@ def edit_artist(artist_id):
   form.city.data = response.city.city
   form.phone.data = response.phone
   form.facebook_link.data = response.facebook_link
+  form.website.data = response.website
+  form.image_link.data = response.image_link
+  form.seeking_venue.data = response.seeking_venue
+  form.seeking_description.data = response.seeking_description
+  print(form.seeking_venue.data)
   return render_template('forms/edit_artist.html', form=form, artist=response)
 
 @app.route('/artists/<int:artist_id>/edit', methods=['POST'])
@@ -321,12 +338,16 @@ def edit_artist_submission(artist_id):
     city_id = city.id
 
   # print(city_id)
-  gen = form.genres.data[:-1]
+  gen = form.genres.data
   artist.name=form.name.data
   artist.phone=form.phone.data
   artist.facebook_link=form.facebook_link.data
   artist.city_id=city_id
   artist.genres=gen
+  artist.website=form.website.data
+  artist.image_link=form.image_link.data
+  artist.seeking_venue=str_to_bool(form.seeking_venue.data)
+  artist.seeking_description=form.seeking_description.data
   # todo = Todo(description=description)
   db.session.commit()
 
@@ -337,7 +358,7 @@ def edit_venue(venue_id):
   form = VenueForm()
   # TODO: populate form with values from venue with ID <venue_id>
   response = Venue.query.get(venue_id)
-  response.genres = response.genere[1:-1].split(',')
+  response.genres = ''.join(response.genere[1:-1]).split(',')
   # state options
   # source:https://stackoverflow.com/questions/37133774/how-can-i-select-only-one-column-using-sqlalchemy
   states = db.session.query(Cities.id, Cities.state).all()
@@ -348,6 +369,10 @@ def edit_venue(venue_id):
   form.address.data = response.address
   form.phone.data = response.phone
   form.facebook_link.data = response.facebook_link
+  form.image_link.data = response.image_link
+  form.website.data = response.website
+  form.seeking_talent.data = response.seeking_talent
+  form.seeking_description.data = response.seeking_description
   return render_template('forms/edit_venue.html', form=form, venue=response)
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
@@ -380,6 +405,10 @@ def edit_venue_submission(venue_id):
   venue.facebook_link=form.facebook_link.data
   venue.city_id=city_id
   venue.genere=gen
+  venue.image_link=form.image_link.data
+  venue.website=form.website.data
+  venue.seeking_talent=str_to_bool(form.seeking_talent.data)
+  venue.seeking_description=form.seeking_description.data
   # todo = Todo(description=description)
   db.session.commit()
 
@@ -393,7 +422,7 @@ def edit_venue_submission(venue_id):
 def create_artist_form():
   form = ArtistForm()
   states = db.session.query(Cities.id, Cities.state).all()
-  form.state.choices=states
+  # form.state.choices=states
   return render_template('forms/new_artist.html', form=form)
 
 @app.route('/artists/create', methods=['POST'])
@@ -403,29 +432,25 @@ def create_artist_submission():
   # TODO: modify data to be the data object returned from db insertion
   form = ArtistForm(request.form)
   # source:https://stackoverflow.com/questions/32938475/flask-sqlalchemy-check-if-row-exists-in-table
-  city_name = db.session.query(Cities.city).filter_by(id=form.state.data).scalar() # is not None
-  if (city_name == form.city.data):
-    print("exist")
-    city_id = form.state.data
-  else:
-    print("No")
-    state = db.session.query(Cities.state).filter_by(id=form.state.data).scalar()
-    city = Cities(city=form.city.data, state=state)
+  city_id = db.session.query(Cities.id).filter_by(state=form.state.data, city=form.city.data).scalar() # is not None
+  if (city_id == None):
+    city = Cities(city=form.city.data, state=form.state.data)
     # source:https://stackoverflow.com/questions/1316952/sqlalchemy-flush-and-get-inserted-id
     db.session.add(city)
     db.session.flush()
     db.session.refresh(city)
     city_id = city.id
 
-  gen = form.genres.data[:-1]
-  artist = Artist(name=form.name.data, phone=form.phone.data, facebook_link=form.facebook_link.data, city_id=city_id, genres=gen)
+  gen = form.genres.data[1:-1]
+  artist = Artist(name=form.name.data, phone=form.phone.data, facebook_link=form.facebook_link.data, city_id=city_id, genres=gen, website=form.website.data, image_link=form.image_link.data, seeking_venue=str_to_bool(form.seeking_venue.data), seeking_description=form.seeking_description.data)
   # todo = Todo(description=description)
   try:
     db.session.add(artist)
     db.session.commit()
-    flash('Venue ' + request.form['name'] + ' was successfully listed!')
-  except:
-    flash('An error occurred. Venue ' + form.name.data + ' could not be listed.')
+    flash('Artist ' + request.form['name'] + ' was successfully listed!')
+  except Exception as e:
+    flash('An error occurred. Artist ' + form.name.data + ' could not be listed.')
+    print(e)
   return render_template('pages/home.html')
 
 
